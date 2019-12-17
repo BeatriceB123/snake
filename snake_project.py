@@ -24,11 +24,12 @@ class NaiveAgent:
         self.actions = p.getActionSet()
 
         self.model = None
-        self.train_frames = 5000
-        self.epsilon = 1
+        self.train_frames = 4000
+        self.epsilon = 2      # exploration rate
         self.observe = 1000
-        self.gamma = 0.9
-        self.batch_size = 128
+        self.gamma = 0.9      # discount rate
+        self.batch_size = 64
+        # self.learning_rate = 0.001?
 
     def getDirection(self):
         current_state = self.instanta.getGameState()
@@ -46,7 +47,6 @@ class NaiveAgent:
                 self.previous_state.get('snake_head_y') < current_state.get('snake_head_y'):
             self.directie = 'jos'
 
-    @property
     def getSensors(self):
         screen_rgb = self.instanta.getScreenRGB()
         screen = game.getScreen()
@@ -168,19 +168,18 @@ class NaiveAgent:
         snake_state = self.instanta.getGameState()
         if len(self.previous_state) == 0:
             self.previous_state = snake_state
-            sensors = self.getSensors
+            sensors = self.getSensors()
         else:
             self.getDirection()
             self.previous_state = snake_state
-            sensors = self.getSensors
+            sensors = self.getSensors()
 
         current_state = sensors.reshape((1, input_layer_size))
         return current_state
 
-    def pickAction(self, current_state, mode):  # reward
+    def pickAction(self, current_state, mode):
         if mode == 'random':
             value = np.random.randint(0, len(self.actions))
-            # print(value)
             return self.actions[value]
         elif mode == 'fit':
             qval = self.model.predict(current_state)
@@ -189,13 +188,11 @@ class NaiveAgent:
 
     def build_model(self, file_weights=''):
         model = Sequential()
-        from keras.activations import elu
-        model.add(layers.Dense(100, activation='linear', kernel_initializer='lecun_uniform', input_shape=(input_layer_size,)))
-        model.add(layers.Dense(100, activation='linear', kernel_initializer='lecun_uniform'))
-        model.add(layers.Dense(4, activation='softmax'))
+        model.add(layers.Dense(100, activation='relu', kernel_initializer='lecun_uniform', input_shape=(input_layer_size,)))
+        model.add(layers.Dense(10, activation='softmax', kernel_initializer='lecun_uniform'))
+        model.add(layers.Dense(4, activation='linear'))
         model.compile(optimizer='rmsprop', loss='categorical_crossentropy', metrics=['accuracy'])
 
-        print(file_weights)
         if file_weights != '':
             model.load_weights(file_weights)
         return model
@@ -203,7 +200,7 @@ class NaiveAgent:
     def save_model(self):
         today = datetime.datetime.today()
         file_name = 'day_' + str(today.day - 17) + '_saved_' + str(today.hour) + '_' + str(today.minute) + '_dnq.h5'
-        self.model.save_weights(file_name, overwrite=True)
+        self.model.save_weights(file_name)
         print("Model salvat!")
 
     def train_net(self):
@@ -221,20 +218,20 @@ class NaiveAgent:
             else:
                 action = self.pickAction(current_state, mode='fit')
 
-            print(self.instanta.getGameState())
-            print(action)
+            # print(self.instanta.getGameState())
+            # print(action)
             reward = self.instanta.act(action)
-            print(self.instanta.getGameState())
+            # print(self.instanta.getGameState())
 
             new_state = self.getCurrentState()
-            print(np.array_equal(current_state, new_state))
+            # print(np.array_equal(current_state, new_state))
 
             if len(replay) == self.observe:
                 replay.popleft()
 
             replay.append((current_state, action, reward, new_state))
-            print((current_state, action, reward, new_state))
-            print(len(replay))
+            # print((current_state, action, reward, new_state))
+            # print(len(replay))
 
             if no_frame > self.observe:
                 minibatch = random.sample(replay, self.batch_size)
@@ -247,7 +244,7 @@ class NaiveAgent:
             if self.epsilon > 0.1 and no_frame > self.observe:
                 self.epsilon -= (1.0 / self.train_frames)
 
-        print(len(replay))
+        # print(len(replay))
         self.save_model()
 
     def process_minibatch(self, minibatch):
@@ -272,19 +269,19 @@ class NaiveAgent:
             rewards_memory[index] = reward_mem
             new_states[index] = new_state_mem.reshape(input_layer_size, )
 
-        print(old_states.shape)
-        print(actions.shape)
-        print(rewards_memory.shape)
-        print(new_states.shape)
+        # print(old_states.shape)
+        # print(actions.shape)
+        # print(rewards_memory.shape)
+        # print(new_states.shape)
 
         old_qvals = self.model.predict(old_states)
         new_qvals = self.model.predict(new_states)
 
-        print(old_qvals.shape)
-        print(new_qvals.shape)
+        # print(old_qvals.shape)
+        # print(new_qvals.shape)
 
         maxQs = np.max(new_qvals, axis=1)
-        print(maxQs.shape)
+        # print(maxQs.shape)
 
         target = old_qvals
         terminal_states_index = \
@@ -292,8 +289,8 @@ class NaiveAgent:
         non_terminal_states_index = \
             np.where(np.logical_and(rewards_memory != rewards['loss'], rewards_memory != rewards['positive']))[0]
 
-        print(terminal_states_index.shape)
-        print(non_terminal_states_index.shape)
+        # print(terminal_states_index.shape)
+        # print(non_terminal_states_index.shape)
 
         target[terminal_states_index, actions[terminal_states_index].astype(int)] = rewards_memory[
             terminal_states_index]
@@ -310,7 +307,7 @@ class NaiveAgent:
             current_state = self.getCurrentState()
             action = self.pickAction(current_state, mode='fit')
             reward = self.instanta.act(action)
-            if reward == rewards['positive']:
+            if reward >= 0:
                 score += 1
 
         print("Score obtained:", score)
@@ -324,15 +321,15 @@ def interface(with_interface=False):
 ########################################################################################################################
 
 
-interface(True)
+interface(False)
 
 game = Snake(width=WIDTH, height=HEIGHT)
 
 rewards = {
     "positive": 100.0,
     "loss": -70.0,
-    "close": 1.4,
-    "tick": -0.1
+    "tick": -0.1,
+    "close": 1.4
 }
 
 p = PLE(game, fps=30, force_fps=False, display_screen=True, reward_values=rewards)
@@ -343,5 +340,6 @@ p.init()
 
 agent.train_net()
 
-# agent.play_game(file_weights='day_0_saved_11_55_dnq.h5')
+# agent.play_game(file_weights='day_0_saved_15_00_dnq.h5')
+
 
