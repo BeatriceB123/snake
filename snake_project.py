@@ -12,27 +12,38 @@ from collections import deque
 WIDTH = 400
 HEIGHT = 400
 
-input_layer_size = 50 * 50
+NO_SENSORS = 50
 
+def interface(with_interface=False):
+    if not with_interface:
+        os.putenv('SDL_VIDEODRIVER', "fbcon")
+        os.environ["SDL_VIDEODRIVER"] = "dummy"
 
-class NaiveAgent:
+class DQNAgent:
 
-    def __init__(self, p):
-        self.instanta = p
+    def __init__(self, p, game, rewards):
+        self.p = p
+        self.game = game
+        self.rewards = rewards
+
         self.directie = 'dreapta'
         self.previous_state = {}
         self.actions = p.getActionSet()
 
         self.model = None
+
         self.train_frames = 4000
-        self.epsilon = 2      # exploration rate
         self.observe = 1000
+
+        self.epsilon = 2      # exploration rate
         self.gamma = 0.9      # discount rate
+
+        self.input_layer_size = NO_SENSORS * NO_SENSORS + 5
         self.batch_size = 64
         # self.learning_rate = 0.001?
 
-    def getDirection(self):
-        current_state = self.instanta.getGameState()
+    def get_direction(self):
+        current_state = self.p.getGameState()
 
         if self.previous_state.get('snake_head_x') < current_state.get('snake_head_x') and \
                 self.previous_state.get('snake_head_y') == current_state.get('snake_head_y'):
@@ -47,22 +58,22 @@ class NaiveAgent:
                 self.previous_state.get('snake_head_y') < current_state.get('snake_head_y'):
             self.directie = 'jos'
 
-    def getSensors(self):
-        screen_rgb = self.instanta.getScreenRGB()
-        screen = game.getScreen()
+    def get_sensors(self):
+        screen_rgb = self.p.getScreenRGB()
+        screen = self.game.getScreen()
 
-        x_snake_head, y_snake_head = game.getActualHeadPosition(self.directie)
+        x_snake_head, y_snake_head = self.game.getActualHeadPosition(self.directie)
 
         pygame.draw.circle(screen, (255, 255, 255), (x_snake_head, y_snake_head), 2)
         pygame.display.update()
 
-        no_rows_matrix = 50
-        no_columns_matrix = 50
+        no_rows_matrix = NO_SENSORS
+        no_columns_matrix = NO_SENSORS
 
         print_value = 20
 
-        food_color = game.getFoodColor()
-        snake_color = game.getSnakeColor()
+        food_color = self.game.getFoodColor()
+        snake_color = self.game.getSnakeColor()
 
         # up
         if self.directie == "sus":
@@ -164,20 +175,63 @@ class NaiveAgent:
                 row += 1
             return np.rot90(sensors, 3)
 
-    def getCurrentState(self):
-        snake_state = self.instanta.getGameState()
+    def get_current_state(self):
+        snake_state = self.p.getGameState()
         if len(self.previous_state) == 0:
             self.previous_state = snake_state
-            sensors = self.getSensors()
+            sensors = self.get_sensors()
         else:
-            self.getDirection()
+            self.get_direction()
             self.previous_state = snake_state
-            sensors = self.getSensors()
+            sensors = self.get_sensors()
 
-        current_state = sensors.reshape((1, input_layer_size))
+        current_state = sensors.reshape((NO_SENSORS * NO_SENSORS,))
+
+        directions = {
+            "sus": 0,
+            "stanga": 0,
+            "dreapta": 0,
+            "jos": 0,
+        }
+        if snake_state['snake_head_x'] <= snake_state['food_x'] and snake_state['snake_head_y'] <= snake_state[
+            'food_y']:
+            directions["sus"] = -1
+            directions["stanga"] = -1
+            directions["dreapta"] = 1
+            directions["jos"] = 1
+        elif snake_state['snake_head_x'] <= snake_state['food_x'] and snake_state['snake_head_y'] >= snake_state[
+            'food_y']:
+            directions["sus"] = 1
+            directions["stanga"] = -1
+            directions["dreapta"] = 1
+            directions["jos"] = -1
+        elif snake_state['snake_head_x'] >= snake_state['food_x'] and snake_state['snake_head_y'] >= snake_state[
+            'food_y']:
+            directions["sus"] = 1
+            directions["stanga"] = 1
+            directions["dreapta"] = -1
+            directions["jos"] = -1
+        elif snake_state['snake_head_x'] >= snake_state['food_x'] and snake_state['snake_head_y'] <= snake_state[
+            'food_y']:
+            directions["sus"] = -1
+            directions["stanga"] = 1
+            directions["dreapta"] = -1
+            directions["jos"] = 1
+
+        directions = np.array([directions[key] for key in directions])
+        current_state = np.append(current_state, directions)
+
+        distance = np.sqrt((snake_state['snake_head_x'] - snake_state['food_x']) ** 2 + (
+                    snake_state['snake_head_y'] - snake_state['food_y']) ** 2)
+
+        distance = np.around(np.array([distance]), decimals=1)
+        current_state = np.append(current_state, distance)
+
+
+        current_state = current_state.reshape((1, self.input_layer_size))
         return current_state
 
-    def pickAction(self, current_state, mode):
+    def pick_action(self, current_state, mode):
         if mode == 'random':
             value = np.random.randint(0, len(self.actions))
             return self.actions[value]
@@ -186,16 +240,107 @@ class NaiveAgent:
             value = np.argmax(qval)
             return self.actions[value]
 
-    def build_model(self, file_weights=''):
+    def build_model(self, file_saved_weights = ''):
         model = Sequential()
-        model.add(layers.Dense(100, activation='relu', kernel_initializer='lecun_uniform', input_shape=(input_layer_size,)))
+        model.add(layers.Dense(100, activation='relu', kernel_initializer='lecun_uniform', input_shape=(self.input_layer_size,)))
         model.add(layers.Dense(10, activation='softmax', kernel_initializer='lecun_uniform'))
         model.add(layers.Dense(4, activation='linear'))
         model.compile(optimizer='rmsprop', loss='categorical_crossentropy', metrics=['accuracy'])
 
-        if file_weights != '':
-            model.load_weights(file_weights)
+        if file_saved_weights != '':
+            model.load_weights(file_saved_weights)
         return model
+
+    def closer_to_food(self,current_state,next_state):
+        distance_current_state = (current_state['snake_head_x'] - current_state['food_x'])**2 + (current_state['snake_head_y'] - current_state['food_y'])**2
+        distance_next_state = (next_state['snake_head_x'] - next_state['food_x'])**2 + (next_state['snake_head_y'] - next_state['food_y'])**2
+        return distance_current_state >= distance_next_state
+
+    def train_net(self):
+        self.model = self.build_model()
+
+        replay = deque(maxlen=self.observe)
+        current_state = self.get_current_state()
+
+        for no_frame in range(self.train_frames):
+            if self.p.game_over():
+                self.p.reset_game()
+
+            print("Frame number " + str(no_frame))
+
+            if random.random() < self.epsilon or no_frame < self.observe:
+                action = self.pick_action(current_state, mode='random')
+            else:
+                action = self.pick_action(current_state, mode='fit')
+
+            old_simple_game_state = self.p.getGameState()
+
+            reward = self.p.act(action)
+
+            new_simple_game_state = self.p.getGameState()
+            new_state = self.get_current_state()
+
+            if reward != self.rewards['loss']:
+                if self.closer_to_food(old_simple_game_state,new_simple_game_state) == True: # reward pt ca s-a apropiat de mancare
+                    reward += self.rewards['close']
+
+            if len(replay) == self.observe:
+                replay.popleft()
+
+            replay.append((current_state, action, reward, new_state))
+
+            if no_frame > self.observe:
+                minibatch = random.sample(replay, self.batch_size)
+                X_train, Y_train = self.process_minibatch(minibatch)
+
+                self.model.fit(X_train, Y_train) # batch_size #epochs
+
+            current_state = new_state
+
+            if self.epsilon > 0.1 and no_frame > self.observe:
+                self.epsilon -= (1.0 / self.train_frames)
+
+        self.save_model()
+
+    def process_minibatch(self, minibatch):
+        len_minibatch = len(minibatch)
+
+        old_states_replay = np.zeros((len_minibatch, self.input_layer_size))
+        actions_replay = np.zeros((len_minibatch,))
+        rewards_replay = np.zeros(len_minibatch, )
+        new_states_replay = np.zeros((len_minibatch, self.input_layer_size))
+
+        for index, memory in enumerate(minibatch):
+            old_state_mem, action_mem, reward_mem, new_state_mem = memory
+            old_states_replay[index] = old_state_mem.reshape(self.input_layer_size, )
+            if action_mem == 119:  # up
+                actions_replay[index] = 0
+            elif action_mem == 97:  # left
+                actions_replay[index] = 1
+            elif action_mem == 100:  # right
+                actions_replay[index] = 2
+            elif action_mem == 115:  # down
+                actions_replay[index] = 3
+            rewards_replay[index] = reward_mem
+            new_states_replay[index] = new_state_mem.reshape(self.input_layer_size, )
+
+        old_qvals = self.model.predict(old_states_replay)
+        new_qvals = self.model.predict(new_states_replay)
+
+        maxQs = np.max(new_qvals, axis=1)
+
+        target = old_qvals
+        terminal_states_index = \
+            np.where(np.logical_or(rewards_replay == self.rewards['loss'], rewards_replay == self.rewards['positive']))[0]
+        non_terminal_states_index = \
+            np.where(np.logical_and(rewards_replay != self.rewards['loss'], rewards_replay != self.rewards['positive']))[0]
+
+        target[terminal_states_index, actions_replay[terminal_states_index].astype(int)] = rewards_replay[
+            terminal_states_index]
+        target[non_terminal_states_index, actions_replay[non_terminal_states_index].astype(int)] \
+            = rewards_replay[non_terminal_states_index] + self.gamma * maxQs[non_terminal_states_index]
+
+        return old_states_replay, target
 
     def save_model(self):
         today = datetime.datetime.today()
@@ -203,143 +348,42 @@ class NaiveAgent:
         self.model.save_weights(file_name)
         print("Model salvat!")
 
-    def train_net(self):
-        self.model = self.build_model()
-
-        replay = deque(maxlen=self.observe)
-        current_state = self.getCurrentState()
-
-        for no_frame in range(self.train_frames):
-            if self.instanta.game_over():
-                self.instanta.reset_game()
-
-            if random.random() < self.epsilon or no_frame < self.observe:
-                action = self.pickAction(current_state, mode='random')
-            else:
-                action = self.pickAction(current_state, mode='fit')
-
-            # print(self.instanta.getGameState())
-            # print(action)
-            reward = self.instanta.act(action)
-            # print(self.instanta.getGameState())
-
-            new_state = self.getCurrentState()
-            # print(np.array_equal(current_state, new_state))
-
-            if len(replay) == self.observe:
-                replay.popleft()
-
-            replay.append((current_state, action, reward, new_state))
-            # print((current_state, action, reward, new_state))
-            # print(len(replay))
-
-            if no_frame > self.observe:
-                minibatch = random.sample(replay, self.batch_size)
-                X_train, Y_train = self.process_minibatch(minibatch)
-
-                self.model.fit(X_train, Y_train, batch_size=self.batch_size)  # epocile
-
-            current_state = new_state
-
-            if self.epsilon > 0.1 and no_frame > self.observe:
-                self.epsilon -= (1.0 / self.train_frames)
-
-        # print(len(replay))
-        self.save_model()
-
-    def process_minibatch(self, minibatch):
-        length = len(minibatch)
-
-        old_states = np.zeros((length, input_layer_size))
-        actions = np.zeros((length,))
-        rewards_memory = np.zeros(length, )
-        new_states = np.zeros((length, input_layer_size))
-
-        for index, memory in enumerate(minibatch):
-            old_state_mem, action_mem, reward_mem, new_state_mem = memory
-            old_states[index] = old_state_mem.reshape(input_layer_size, )
-            if action_mem == 119:  # up
-                actions[index] = 0
-            elif action_mem == 97:  # left
-                actions[index] = 1
-            elif action_mem == 100:  # right
-                actions[index] = 2
-            elif action_mem == 115:  # down
-                actions[index] = 3
-            rewards_memory[index] = reward_mem
-            new_states[index] = new_state_mem.reshape(input_layer_size, )
-
-        # print(old_states.shape)
-        # print(actions.shape)
-        # print(rewards_memory.shape)
-        # print(new_states.shape)
-
-        old_qvals = self.model.predict(old_states)
-        new_qvals = self.model.predict(new_states)
-
-        # print(old_qvals.shape)
-        # print(new_qvals.shape)
-
-        maxQs = np.max(new_qvals, axis=1)
-        # print(maxQs.shape)
-
-        target = old_qvals
-        terminal_states_index = \
-            np.where(np.logical_or(rewards_memory == rewards['loss'], rewards_memory == rewards['positive']))[0]
-        non_terminal_states_index = \
-            np.where(np.logical_and(rewards_memory != rewards['loss'], rewards_memory != rewards['positive']))[0]
-
-        # print(terminal_states_index.shape)
-        # print(non_terminal_states_index.shape)
-
-        target[terminal_states_index, actions[terminal_states_index].astype(int)] = rewards_memory[
-            terminal_states_index]
-        target[non_terminal_states_index, actions[non_terminal_states_index].astype(int)] \
-            = rewards_memory[non_terminal_states_index] + self.gamma * maxQs[non_terminal_states_index]
-
-        return old_states, target
-
-    def play_game(self, file_weights):
-        self.model = self.build_model(file_weights)
+    def play_game(self, file_saved_weights):
+        self.model = self.build_model(file_saved_weights)
 
         score = 0
-        while not self.instanta.game_over():
-            current_state = self.getCurrentState()
-            action = self.pickAction(current_state, mode='fit')
-            reward = self.instanta.act(action)
-            if reward >= 0:
+        while not self.p.game_over():
+            current_state = self.get_current_state()
+            action = self.pick_action(current_state, mode='fit')
+            reward = self.p.act(action)
+            if reward == self.rewards['positive']:
                 score += 1
 
         print("Score obtained:", score)
 
 
-def interface(with_interface=False):
-    if not with_interface:
-        os.putenv('SDL_VIDEODRIVER', "fbcon")
-        os.environ["SDL_VIDEODRIVER"] = "dummy"
-
 ########################################################################################################################
 
+if __name__ == "__main__":
+    interface(True)
 
-interface(False)
+    game = Snake(width=WIDTH, height=HEIGHT)
 
-game = Snake(width=WIDTH, height=HEIGHT)
+    rewards = {
+        "positive": 100.0,
+        "loss": -70.0,
+        "tick": -0.1,
+        "close": 1.5
+    }
 
-rewards = {
-    "positive": 100.0,
-    "loss": -70.0,
-    "tick": -0.1,
-    "close": 1.4
-}
+    p = PLE(game, fps=30, force_fps=False, display_screen=True, reward_values=rewards)
 
-p = PLE(game, fps=30, force_fps=False, display_screen=True, reward_values=rewards)
+    agent = DQNAgent(p,game,rewards)
 
-agent = NaiveAgent(p)
+    p.init()
 
-p.init()
+    agent.train_net()
 
-agent.train_net()
-
-# agent.play_game(file_weights='day_0_saved_15_00_dnq.h5')
+    #agent.play_game(file_saved_weights='day_0_saved_21_44_dnq.h5')
 
 
