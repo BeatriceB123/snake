@@ -14,10 +14,15 @@ HEIGHT = 400
 
 NO_SENSORS = 50
 
+
 def interface(with_interface=False):
     if not with_interface:
-        os.putenv('SDL_VIDEODRIVER', "fbcon")
+        #os.putenv('SDL_VIDEODRIVER', "fbcon")
         os.environ["SDL_VIDEODRIVER"] = "dummy"
+    else:
+        #os.putenv('SDL_VIDEODRIVER', "x11")
+        os.environ["SDL_VIDEODRIVER"] = "fbcon"  #"windib" for windows "x11"
+
 
 class DQNAgent:
 
@@ -34,13 +39,24 @@ class DQNAgent:
 
         self.train_frames = 4000
         self.observe = 1000
+        self.no_frames_to_save = 2000
 
-        self.epsilon = 2      # exploration rate
-        self.gamma = 0.9      # discount rate
+        self.epsilon = 2  # exploration rate
+        self.gamma = 0.9  # discount rate
 
         self.input_layer_size = NO_SENSORS * NO_SENSORS + 5
         self.batch_size = 64
         # self.learning_rate = 0.001?
+
+        self.model_params = {
+            "dimension_layer1": 100,
+            "activation_layer1": "relu",
+            "dimension_layer2": 10,
+            "activation_layer2": "softmax",
+            "activation_layer3": "linear"
+        }
+
+
 
     def get_direction(self):
         current_state = self.p.getGameState()
@@ -222,11 +238,10 @@ class DQNAgent:
         current_state = np.append(current_state, directions)
 
         distance = np.sqrt((snake_state['snake_head_x'] - snake_state['food_x']) ** 2 + (
-                    snake_state['snake_head_y'] - snake_state['food_y']) ** 2)
+                snake_state['snake_head_y'] - snake_state['food_y']) ** 2)
 
         distance = np.around(np.array([distance]), decimals=1)
         current_state = np.append(current_state, distance)
-
 
         current_state = current_state.reshape((1, self.input_layer_size))
         return current_state
@@ -240,23 +255,36 @@ class DQNAgent:
             value = np.argmax(qval)
             return self.actions[value]
 
-    def build_model(self, file_saved_weights = ''):
+    def build_model(self, file_saved_weights=''):
         model = Sequential()
-        model.add(layers.Dense(100, activation='relu', kernel_initializer='lecun_uniform', input_shape=(self.input_layer_size,)))
-        model.add(layers.Dense(10, activation='softmax', kernel_initializer='lecun_uniform'))
-        model.add(layers.Dense(4, activation='linear'))
+        model.add(layers.Dense(self.model_params['dimension_layer1'], activation=self.model_params['activation_layer1'],
+                               kernel_initializer='lecun_uniform', input_shape=(self.input_layer_size,)))
+        model.add(layers.Dense(self.model_params['dimension_layer2'], activation=self.model_params['activation_layer2'],
+                               kernel_initializer='lecun_uniform'))
+        model.add(layers.Dense(4, activation=self.model_params['activation_layer3']))
         model.compile(optimizer='rmsprop', loss='categorical_crossentropy', metrics=['accuracy'])
 
         if file_saved_weights != '':
             model.load_weights(file_saved_weights)
         return model
 
-    def closer_to_food(self,current_state,next_state):
-        distance_current_state = (current_state['snake_head_x'] - current_state['food_x'])**2 + (current_state['snake_head_y'] - current_state['food_y'])**2
-        distance_next_state = (next_state['snake_head_x'] - next_state['food_x'])**2 + (next_state['snake_head_y'] - next_state['food_y'])**2
+    def closer_to_food(self, current_state, next_state):
+        distance_current_state = (current_state['snake_head_x'] - current_state['food_x']) ** 2 + (
+                current_state['snake_head_y'] - current_state['food_y']) ** 2
+        distance_next_state = (next_state['snake_head_x'] - next_state['food_x']) ** 2 + (
+                next_state['snake_head_y'] - next_state['food_y']) ** 2
         return distance_current_state >= distance_next_state
 
-    def train_net(self):
+    def train_net(self, train_frames=0, batch_size=0, model_params=None, no_frames_to_save=0):
+        if train_frames != 0:
+            self.train_frames = train_frames
+        if batch_size != 0:
+            self.batch_size = batch_size
+        if model_params is not None:
+            self.model_params = model_params
+        if no_frames_to_save != 0:
+            self.no_frames_to_save = no_frames_to_save
+
         self.model = self.build_model()
 
         replay = deque(maxlen=self.observe)
@@ -281,7 +309,8 @@ class DQNAgent:
             new_state = self.get_current_state()
 
             if reward != self.rewards['loss']:
-                if self.closer_to_food(old_simple_game_state,new_simple_game_state) == True: # reward pt ca s-a apropiat de mancare
+                if self.closer_to_food(old_simple_game_state,
+                                       new_simple_game_state) == True:  # reward pt ca s-a apropiat de mancare
                     reward += self.rewards['close']
 
             if len(replay) == self.observe:
@@ -293,12 +322,15 @@ class DQNAgent:
                 minibatch = random.sample(replay, self.batch_size)
                 X_train, Y_train = self.process_minibatch(minibatch)
 
-                self.model.fit(X_train, Y_train) # batch_size #epochs
+                self.model.fit(X_train, Y_train)  # batch_size #epochs
 
             current_state = new_state
 
             if self.epsilon > 0.1 and no_frame > self.observe:
                 self.epsilon -= (1.0 / self.train_frames)
+
+            if no_frame != 0 and no_frame % self.no_frames_to_save == 0:
+                self.save_model()
 
         self.save_model()
 
@@ -331,9 +363,11 @@ class DQNAgent:
 
         target = old_qvals
         terminal_states_index = \
-            np.where(np.logical_or(rewards_replay == self.rewards['loss'], rewards_replay == self.rewards['positive']))[0]
+            np.where(np.logical_or(rewards_replay == self.rewards['loss'], rewards_replay == self.rewards['positive']))[
+                0]
         non_terminal_states_index = \
-            np.where(np.logical_and(rewards_replay != self.rewards['loss'], rewards_replay != self.rewards['positive']))[0]
+            np.where(
+                np.logical_and(rewards_replay != self.rewards['loss'], rewards_replay != self.rewards['positive']))[0]
 
         target[terminal_states_index, actions_replay[terminal_states_index].astype(int)] = rewards_replay[
             terminal_states_index]
@@ -348,7 +382,12 @@ class DQNAgent:
         self.model.save_weights(file_name)
         print("Model salvat!")
 
-    def play_game(self, file_saved_weights):
+        self.play_game(file_name)
+
+    def play_game(self, file_saved_weights, model_params=None):
+        if model_params is not None:
+            self.model_params = model_params
+
         self.model = self.build_model(file_saved_weights)
 
         score = 0
@@ -359,13 +398,15 @@ class DQNAgent:
             if reward == self.rewards['positive']:
                 score += 1
 
+        interface(True)
         print("Score obtained:", score)
+        interface(False)
 
 
 ########################################################################################################################
 
 if __name__ == "__main__":
-    interface(True)
+    interface(False)
 
     game = Snake(width=WIDTH, height=HEIGHT)
 
@@ -378,12 +419,17 @@ if __name__ == "__main__":
 
     p = PLE(game, fps=30, force_fps=False, display_screen=True, reward_values=rewards)
 
-    agent = DQNAgent(p,game,rewards)
+    agent = DQNAgent(p, game, rewards)
 
     p.init()
 
-    agent.train_net()
+    nn_params = {
+        "dimension_layer1": 100,
+        "activation_layer1": "linear",
+        "dimension_layer2": 100,
+        "activation_layer2": "linear",
+        "activation_layer3": "softmax"
+    }
+    agent.train_net(train_frames=10000,batch_size=100,model_params=nn_params,no_frames_to_save=1000)
 
-    #agent.play_game(file_saved_weights='day_0_saved_21_44_dnq.h5')
-
-
+    #agent.play_game(file_saved_weights='day_0_saved_22_45_dnq.h5',model_params=nn_params)
