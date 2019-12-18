@@ -19,9 +19,45 @@ def interface(with_interface=False):
     if not with_interface:
         # os.putenv('SDL_VIDEODRIVER', "fbcon")
         os.environ["SDL_VIDEODRIVER"] = "dummy"
-    else:
-        os.environ["SDL_VIDEODRIVER"] = "windib"  # "windib" for windows ceva.. for linux
+    #else:
+        #os.putenv('SDL_VIDEODRIVER', "windib")
+        #os.environ["SDL_VIDEODRIVER"] = None  # "windib" for windows ceva.. for linux
+        #os.environ.setdefault()
+        #del os.environ["SDL_VIDEODRIVER"]
 
+#class interface():
+#    def __init__(self,with_interface=False):
+#        if not with_interface:
+#            # os.putenv('SDL_VIDEODRIVER', "fbcon")
+#            self.copy_env = os.environ.copy()
+#            os.environ["SDL_VIDEODRIVER"] = "dummy"
+#
+#        #else:
+#        #    os.putenv('SDL_VIDEODRIVER', "windib")
+#            # os.environ["SDL_VIDEODRIVER"] = "directx"  # "windib" for windows ceva.. for linux
+#            # os.environ.setdefault()
+#    def __enter__(self):
+#        return None
+#    def __exit__(self, exc_type, exc_val, exc_tb):
+#        os.environ = self.copy_env
+#
+#def play_game_cuurent_model(filename_weights, nn_params, rewards):
+#
+#    print(os.getenv("SDL_VIDEODRIVER"))
+#    #interface(True)
+#    #print(os.getenv("SDL_VIDEODRIVER"))
+#
+#    new_game = Snake(width=WIDTH, height=HEIGHT)
+#
+#    new_p = PLE(new_game, fps=30, force_fps=False, display_screen=True, reward_values=rewards)
+#
+#    new_agent = DQNAgent(new_p, new_game, rewards)
+#
+#    new_p.init()
+#
+#    new_agent.play_game(file_saved_weights=filename_weights, model_params=nn_params)
+#
+#    #interface(False)
 
 class DQNAgent:
 
@@ -35,6 +71,7 @@ class DQNAgent:
         self.actions = p.getActionSet()
 
         self.model = None
+        #self.model_play = None
 
         self.train_frames = 4000
         self.observe = 1000
@@ -380,18 +417,18 @@ class DQNAgent:
         today = datetime.datetime.today()
         file_name = 'day_' + str(today.day - 17) + '_saved_' + str(today.hour) + '_' + str(today.minute) + '_dnq.h5'
         self.model.save_weights(file_name)
+        #print(os.getenv("SDL_VIDEODRIVER"))
         print("Model", file_name, "salvat!", sep=" ")
 
-        interface(True)
-        self.play_game(file_name)
-        interface(False)
+        #play_game_cuurent_model(file_name,self.model_params,self.rewards)
 
     def play_game(self, file_saved_weights, model_params=None):
         if model_params is not None:
             self.model_params = model_params
 
         self.model = self.build_model(file_saved_weights)
-
+        #print("altceva")
+        #print(os.getenv("SDL_VIDEODRIVER"))
         score = 0
         while not self.p.game_over():
             current_state = self.get_current_state()
@@ -402,10 +439,13 @@ class DQNAgent:
         print("Score obtained:", score)
 
 
+
 ########################################################################################################################
 
 if __name__ == "__main__":
-    interface(False)
+    #print(os.getenv("SDL_VIDEODRIVER"))
+    #interface(False)
+    interface(True)
 
     game = Snake(width=WIDTH, height=HEIGHT)
 
@@ -416,7 +456,11 @@ if __name__ == "__main__":
         "close": 1.5
     }
 
+
+    #with interface(False):
     p = PLE(game, fps=30, force_fps=False, display_screen=True, reward_values=rewards)
+
+    #print(os.getenv("SDL_VIDEODRIVER"))
 
     agent = DQNAgent(p, game, rewards)
 
@@ -429,6 +473,7 @@ if __name__ == "__main__":
         "activation_layer2": "linear",
         "activation_layer3": "softmax"
     }
-    agent.train_net(train_frames=10000, batch_size=100, model_params=nn_params, no_frames_to_save=1000, ep=6)
+    #agent.train_net(train_frames=10000, batch_size=100, model_params=nn_params, no_frames_to_save=100, ep=6)
 
-    #agent.play_game(file_saved_weights='day_1_saved_9_15_dnq.h5', model_params=nn_params)
+    agent.play_game(file_saved_weights='day_1_saved_9_15_dnq.h5', model_params=nn_params)
+
