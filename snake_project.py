@@ -1,19 +1,26 @@
 import numpy as np
-from ple import PLE
-
 import os
 import datetime
-from ple.games.snake import Snake
 import pygame
-from keras import Sequential, layers
 import random
+from ple import PLE
+from ple.games.snake import Snake
+from keras import Sequential, layers
 from collections import deque
+import playing_snake
+
+from threading import Thread
+import keras.backend.tensorflow_backend as tb
+tb._SYMBOLIC_SCOPE.value = True
 
 WIDTH = 400
 HEIGHT = 400
 
 NO_SENSORS = 50
 
+print(os.environ)
+copy_env = os.environ.copy()
+print(copy_env)
 
 def interface(with_interface=False):
     if not with_interface:
@@ -25,22 +32,20 @@ def interface(with_interface=False):
         #os.environ.setdefault()
         #del os.environ["SDL_VIDEODRIVER"]
 
-#class interface():
-#    def __init__(self,with_interface=False):
-#        if not with_interface:
-#            # os.putenv('SDL_VIDEODRIVER', "fbcon")
-#            self.copy_env = os.environ.copy()
-#            os.environ["SDL_VIDEODRIVER"] = "dummy"
-#
-#        #else:
-#        #    os.putenv('SDL_VIDEODRIVER', "windib")
-#            # os.environ["SDL_VIDEODRIVER"] = "directx"  # "windib" for windows ceva.. for linux
-#            # os.environ.setdefault()
-#    def __enter__(self):
-#        return None
-#    def __exit__(self, exc_type, exc_val, exc_tb):
-#        os.environ = self.copy_env
-#
+class interface_window():
+    def __init__(self,with_interface=False):
+        pass
+        #os.environ.update(copy_env)
+        #os.putenv('SDL_VIDEODRIVER', 'fbcon')
+        #pygame.display.init()
+    def __enter__(self):
+        pass
+        #return None
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        pass
+        #os.environ["SDL_VIDEODRIVER"] = "dummy"
+
+
 #def play_game_cuurent_model(filename_weights, nn_params, rewards):
 #
 #    print(os.getenv("SDL_VIDEODRIVER"))
@@ -417,18 +422,23 @@ class DQNAgent:
         today = datetime.datetime.today()
         file_name = 'day_' + str(today.day - 17) + '_saved_' + str(today.hour) + '_' + str(today.minute) + '_dnq.h5'
         self.model.save_weights(file_name)
-        #print(os.getenv("SDL_VIDEODRIVER"))
         print("Model", file_name, "salvat!", sep=" ")
 
-        #play_game_cuurent_model(file_name,self.model_params,self.rewards)
+        with interface_window():
+            os.environ = copy_env
+            playing_snake.play_game_current_model(file_name, self.model_params, self.rewards)
+
+        #thread = Thread(target=playing_snake.play_game_current_model, args=(file_name,self.model_params,self.rewards))
+        #thread.start()
+        #thread.join()
+        #print("thread finished")
 
     def play_game(self, file_saved_weights, model_params=None):
         if model_params is not None:
             self.model_params = model_params
 
         self.model = self.build_model(file_saved_weights)
-        #print("altceva")
-        #print(os.getenv("SDL_VIDEODRIVER"))
+
         score = 0
         while not self.p.game_over():
             current_state = self.get_current_state()
@@ -444,8 +454,7 @@ class DQNAgent:
 
 if __name__ == "__main__":
     #print(os.getenv("SDL_VIDEODRIVER"))
-    #interface(False)
-    interface(True)
+    interface(False)
 
     game = Snake(width=WIDTH, height=HEIGHT)
 
@@ -460,8 +469,6 @@ if __name__ == "__main__":
     #with interface(False):
     p = PLE(game, fps=30, force_fps=False, display_screen=True, reward_values=rewards)
 
-    #print(os.getenv("SDL_VIDEODRIVER"))
-
     agent = DQNAgent(p, game, rewards)
 
     p.init()
@@ -473,7 +480,8 @@ if __name__ == "__main__":
         "activation_layer2": "linear",
         "activation_layer3": "softmax"
     }
-    #agent.train_net(train_frames=10000, batch_size=100, model_params=nn_params, no_frames_to_save=100, ep=6)
 
-    agent.play_game(file_saved_weights='day_1_saved_9_15_dnq.h5', model_params=nn_params)
+    agent.train_net(train_frames=2000, batch_size=100, model_params=nn_params, no_frames_to_save=100, ep=6)
+
+    #agent.play_game(file_saved_weights='day_1_saved_9_15_dnq.h5', model_params=nn_params)
 
