@@ -20,8 +20,7 @@ def interface(with_interface=False):
         # os.putenv('SDL_VIDEODRIVER', "fbcon")
         os.environ["SDL_VIDEODRIVER"] = "dummy"
     else:
-        # os.putenv('SDL_VIDEODRIVER', "x11")
-        os.environ["SDL_VIDEODRIVER"] = "windib"  # "windib" for windows "x11"
+        os.environ["SDL_VIDEODRIVER"] = "windib"  # "windib" for windows ceva.. for linux
 
 
 class DQNAgent:
@@ -285,6 +284,7 @@ class DQNAgent:
             self.no_frames_to_save = no_frames_to_save
         if ep != 0:
             self.epochs = ep
+
         self.model = self.build_model()
 
         replay = deque(maxlen=self.observe)
@@ -382,7 +382,9 @@ class DQNAgent:
         self.model.save_weights(file_name)
         print("Model", file_name, "salvat!", sep=" ")
 
+        interface(True)
         self.play_game(file_name)
+        interface(False)
 
     def play_game(self, file_saved_weights, model_params=None):
         if model_params is not None:
@@ -403,7 +405,7 @@ class DQNAgent:
 ########################################################################################################################
 
 if __name__ == "__main__":
-    interface(True)
+    interface(False)
 
     game = Snake(width=WIDTH, height=HEIGHT)
 
@@ -427,6 +429,6 @@ if __name__ == "__main__":
         "activation_layer2": "linear",
         "activation_layer3": "softmax"
     }
-    # agent.train_net(train_frames=10000, batch_size=100, model_params=nn_params, no_frames_to_save=1000, ep=6)
+    agent.train_net(train_frames=10000, batch_size=100, model_params=nn_params, no_frames_to_save=1000, ep=6)
 
-    agent.play_game(file_saved_weights='day_1_saved_9_15_dnq.h5', model_params=nn_params)
+    #agent.play_game(file_saved_weights='day_1_saved_9_15_dnq.h5', model_params=nn_params)
