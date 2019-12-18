@@ -17,11 +17,11 @@ NO_SENSORS = 50
 
 def interface(with_interface=False):
     if not with_interface:
-        #os.putenv('SDL_VIDEODRIVER', "fbcon")
+        # os.putenv('SDL_VIDEODRIVER', "fbcon")
         os.environ["SDL_VIDEODRIVER"] = "dummy"
     else:
-        #os.putenv('SDL_VIDEODRIVER', "x11")
-        os.environ["SDL_VIDEODRIVER"] = "fbcon"  #"windib" for windows "x11"
+        # os.putenv('SDL_VIDEODRIVER', "x11")
+        os.environ["SDL_VIDEODRIVER"] = "windib"  # "windib" for windows "x11"
 
 
 class DQNAgent:
@@ -47,6 +47,7 @@ class DQNAgent:
         self.input_layer_size = NO_SENSORS * NO_SENSORS + 5
         self.batch_size = 64
         # self.learning_rate = 0.001?
+        self.epochs = 1
 
         self.model_params = {
             "dimension_layer1": 100,
@@ -55,8 +56,6 @@ class DQNAgent:
             "activation_layer2": "softmax",
             "activation_layer3": "linear"
         }
-
-
 
     def get_direction(self):
         current_state = self.p.getGameState()
@@ -275,7 +274,7 @@ class DQNAgent:
                 next_state['snake_head_y'] - next_state['food_y']) ** 2
         return distance_current_state >= distance_next_state
 
-    def train_net(self, train_frames=0, batch_size=0, model_params=None, no_frames_to_save=0):
+    def train_net(self, train_frames=0, batch_size=0, model_params=None, no_frames_to_save=0, ep=0):
         if train_frames != 0:
             self.train_frames = train_frames
         if batch_size != 0:
@@ -284,7 +283,8 @@ class DQNAgent:
             self.model_params = model_params
         if no_frames_to_save != 0:
             self.no_frames_to_save = no_frames_to_save
-
+        if ep != 0:
+            self.epochs = ep
         self.model = self.build_model()
 
         replay = deque(maxlen=self.observe)
@@ -309,12 +309,12 @@ class DQNAgent:
             new_state = self.get_current_state()
 
             if reward != self.rewards['loss']:
-                if self.closer_to_food(old_simple_game_state,
-                                       new_simple_game_state) == True:  # reward pt ca s-a apropiat de mancare
+                if self.closer_to_food(old_simple_game_state, new_simple_game_state):  # reward pt ca s-a apropiat de mancare
                     reward += self.rewards['close']
 
             if len(replay) == self.observe:
                 replay.popleft()
+
 
             replay.append((current_state, action, reward, new_state))
 
@@ -322,7 +322,7 @@ class DQNAgent:
                 minibatch = random.sample(replay, self.batch_size)
                 X_train, Y_train = self.process_minibatch(minibatch)
 
-                self.model.fit(X_train, Y_train)  # batch_size #epochs
+                self.model.fit(X_train, Y_train, epochs=self.epochs)  # batch_size #epochs
 
             current_state = new_state
 
@@ -380,7 +380,7 @@ class DQNAgent:
         today = datetime.datetime.today()
         file_name = 'day_' + str(today.day - 17) + '_saved_' + str(today.hour) + '_' + str(today.minute) + '_dnq.h5'
         self.model.save_weights(file_name)
-        print("Model salvat!")
+        print("Model", file_name, "salvat!", sep=" ")
 
         self.play_game(file_name)
 
@@ -397,16 +397,13 @@ class DQNAgent:
             reward = self.p.act(action)
             if reward == self.rewards['positive']:
                 score += 1
-
-        interface(True)
         print("Score obtained:", score)
-        interface(False)
 
 
 ########################################################################################################################
 
 if __name__ == "__main__":
-    interface(False)
+    interface(True)
 
     game = Snake(width=WIDTH, height=HEIGHT)
 
@@ -424,12 +421,12 @@ if __name__ == "__main__":
     p.init()
 
     nn_params = {
-        "dimension_layer1": 100,
+        "dimension_layer1": 200,
         "activation_layer1": "linear",
-        "dimension_layer2": 100,
+        "dimension_layer2": 30,
         "activation_layer2": "linear",
         "activation_layer3": "softmax"
     }
-    agent.train_net(train_frames=10000,batch_size=100,model_params=nn_params,no_frames_to_save=1000)
+    # agent.train_net(train_frames=10000, batch_size=100, model_params=nn_params, no_frames_to_save=1000, ep=6)
 
-    #agent.play_game(file_saved_weights='day_0_saved_22_45_dnq.h5',model_params=nn_params)
+    agent.play_game(file_saved_weights='day_1_saved_9_15_dnq.h5', model_params=nn_params)
