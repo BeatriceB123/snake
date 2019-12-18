@@ -1,10 +1,11 @@
 import snake_project
 from ple import PLE
 from ple.games.snake import Snake
+import sys
+import json
 
 WIDTH = 400
 HEIGHT = 400
-
 
 def play_game_current_model(filename_weights, nn_params, rewards):
     new_game = Snake(width=WIDTH, height=HEIGHT)
@@ -20,19 +21,26 @@ def play_game_current_model(filename_weights, nn_params, rewards):
 
 if __name__ == "__main__":
 
-    rewards = {
-        "positive": 100.0,
-        "loss": -70.0,
-        "tick": -0.1,
-        "close": 1.5
-    }
+    if len(sys.argv) > 1:
+        file = sys.argv[1]
+        rewards = json.loads(sys.argv[2])
+        nn_params = json.loads(sys.argv[3])
 
-    nn_params = {
-        "dimension_layer1": 200,
-        "activation_layer1": "linear",
-        "dimension_layer2": 30,
-        "activation_layer2": "linear",
-        "activation_layer3": "softmax"
-    }
+    else:
+        file = 'day_1_saved_19_24_dnq.h5'
+        rewards = {
+            "positive": 100.0,
+            "loss": -70.0,
+            "tick": -0.1,
+            "close": 1.5
+        }
 
-    play_game_current_model(filename_weights='day_1_saved_13_25_dnq.h5', nn_params=nn_params, rewards=rewards)
+        nn_params = {
+            "dimension_layer1": 200,
+            "activation_layer1": "linear",
+            "dimension_layer2": 30,
+            "activation_layer2": "linear",
+            "activation_layer3": "softmax"
+        }
+
+    play_game_current_model(filename_weights=file, nn_params=nn_params, rewards=rewards)

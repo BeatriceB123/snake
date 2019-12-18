@@ -7,62 +7,22 @@ from ple import PLE
 from ple.games.snake import Snake
 from keras import Sequential, layers
 from collections import deque
-import playing_snake
-
-from threading import Thread
-import keras.backend.tensorflow_backend as tb
-tb._SYMBOLIC_SCOPE.value = True
+import subprocess
+import json
 
 WIDTH = 400
 HEIGHT = 400
 
 NO_SENSORS = 50
 
-print(os.environ)
-copy_env = os.environ.copy()
-print(copy_env)
+original_env = os.environ.copy()
+
 
 def interface(with_interface=False):
     if not with_interface:
         # os.putenv('SDL_VIDEODRIVER', "fbcon")
         os.environ["SDL_VIDEODRIVER"] = "dummy"
-    #else:
-        #os.putenv('SDL_VIDEODRIVER', "windib")
-        #os.environ["SDL_VIDEODRIVER"] = None  # "windib" for windows ceva.. for linux
-        #os.environ.setdefault()
-        #del os.environ["SDL_VIDEODRIVER"]
 
-class interface_window():
-    def __init__(self,with_interface=False):
-        pass
-        #os.environ.update(copy_env)
-        #os.putenv('SDL_VIDEODRIVER', 'fbcon')
-        #pygame.display.init()
-    def __enter__(self):
-        pass
-        #return None
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        pass
-        #os.environ["SDL_VIDEODRIVER"] = "dummy"
-
-
-#def play_game_cuurent_model(filename_weights, nn_params, rewards):
-#
-#    print(os.getenv("SDL_VIDEODRIVER"))
-#    #interface(True)
-#    #print(os.getenv("SDL_VIDEODRIVER"))
-#
-#    new_game = Snake(width=WIDTH, height=HEIGHT)
-#
-#    new_p = PLE(new_game, fps=30, force_fps=False, display_screen=True, reward_values=rewards)
-#
-#    new_agent = DQNAgent(new_p, new_game, rewards)
-#
-#    new_p.init()
-#
-#    new_agent.play_game(file_saved_weights=filename_weights, model_params=nn_params)
-#
-#    #interface(False)
 
 class DQNAgent:
 
@@ -76,19 +36,20 @@ class DQNAgent:
         self.actions = p.getActionSet()
 
         self.model = None
-        #self.model_play = None
 
         self.train_frames = 4000
-        self.observe = 1000
+        self.observe = 5000
         self.no_frames_to_save = 2000
+        self.no_frames_between_trains = 100
 
         self.epsilon = 2  # exploration rate
         self.gamma = 0.9  # discount rate
+        self.reduce_epsilon = 0.000001  # 10^(-6)
 
         self.input_layer_size = NO_SENSORS * NO_SENSORS + 5
         self.batch_size = 64
-        # self.learning_rate = 0.001?
         self.epochs = 1
+        # self.learning_rate = 0.001?
 
         self.model_params = {
             "dimension_layer1": 100,
@@ -298,9 +259,10 @@ class DQNAgent:
     def build_model(self, file_saved_weights=''):
         model = Sequential()
         model.add(layers.Dense(self.model_params['dimension_layer1'], activation=self.model_params['activation_layer1'],
-                               kernel_initializer='lecun_uniform', input_shape=(self.input_layer_size,)))
+                               kernel_initializer='glorot_normal',
+                               input_shape=(self.input_layer_size,)))  # lecun_uniform #ceva random
         model.add(layers.Dense(self.model_params['dimension_layer2'], activation=self.model_params['activation_layer2'],
-                               kernel_initializer='lecun_uniform'))
+                               kernel_initializer='glorot_normal'))
         model.add(layers.Dense(4, activation=self.model_params['activation_layer3']))
         model.compile(optimizer='rmsprop', loss='categorical_crossentropy', metrics=['accuracy'])
 
@@ -315,7 +277,8 @@ class DQNAgent:
                 next_state['snake_head_y'] - next_state['food_y']) ** 2
         return distance_current_state >= distance_next_state
 
-    def train_net(self, train_frames=0, batch_size=0, model_params=None, no_frames_to_save=0, ep=0):
+    def train_net(self, train_frames=0, batch_size=0, model_params=None, no_frames_to_save=0, ep=0,
+                  no_frames_between_trains=0):
         if train_frames != 0:
             self.train_frames = train_frames
         if batch_size != 0:
@@ -326,17 +289,23 @@ class DQNAgent:
             self.no_frames_to_save = no_frames_to_save
         if ep != 0:
             self.epochs = ep
+        if no_frames_between_trains != 0:
+            self.no_frames_between_trains = no_frames_between_trains
 
         self.model = self.build_model()
 
         replay = deque(maxlen=self.observe)
         current_state = self.get_current_state()
+        current_score = 0
+        no_frame = 0
 
-        for no_frame in range(self.train_frames):
+        # for no_frame in range(self.train_frames):
+        while True:
             if self.p.game_over():
                 self.p.reset_game()
+                current_score = 0
 
-            print("Frame number " + str(no_frame))
+            print("Frame number: " + str(no_frame))
 
             if random.random() < self.epsilon or no_frame < self.observe:
                 action = self.pick_action(current_state, mode='random')
@@ -351,16 +320,21 @@ class DQNAgent:
             new_state = self.get_current_state()
 
             if reward != self.rewards['loss']:
-                if self.closer_to_food(old_simple_game_state, new_simple_game_state):  # reward pt ca s-a apropiat de mancare
+                if self.closer_to_food(old_simple_game_state,
+                                       new_simple_game_state):  # reward pt ca s-a apropiat de mancare
                     reward += self.rewards['close']
+
+            if self.p.score() >= self.rewards['positive']:
+                current_state += 1
+
+            print("Current score: " + str(current_score))
 
             if len(replay) == self.observe:
                 replay.popleft()
 
-
             replay.append((current_state, action, reward, new_state))
 
-            if no_frame > self.observe:
+            if no_frame > self.observe and no_frame % self.no_frames_between_trains == 0:
                 minibatch = random.sample(replay, self.batch_size)
                 X_train, Y_train = self.process_minibatch(minibatch)
 
@@ -369,10 +343,13 @@ class DQNAgent:
             current_state = new_state
 
             if self.epsilon > 0.1 and no_frame > self.observe:
-                self.epsilon -= (1.0 / self.train_frames)
+                # self.epsilon -= (1.0 / self.train_frames)
+                self.epsilon -= (1.0 / self.reduce_epsilon)
 
             if no_frame != 0 and no_frame % self.no_frames_to_save == 0:
                 self.save_model()
+
+            no_frame += 1
 
         self.save_model()
 
@@ -424,14 +401,9 @@ class DQNAgent:
         self.model.save_weights(file_name)
         print("Model", file_name, "salvat!", sep=" ")
 
-        with interface_window():
-            os.environ = copy_env
-            playing_snake.play_game_current_model(file_name, self.model_params, self.rewards)
-
-        #thread = Thread(target=playing_snake.play_game_current_model, args=(file_name,self.model_params,self.rewards))
-        #thread.start()
-        #thread.join()
-        #print("thread finished")
+        subprocess.Popen(
+            ["python3.6", "playing_snake.py", file_name, json.dumps(self.rewards), json.dumps(self.model_params)],
+            env=original_env)
 
     def play_game(self, file_saved_weights, model_params=None):
         if model_params is not None:
@@ -444,16 +416,14 @@ class DQNAgent:
             current_state = self.get_current_state()
             action = self.pick_action(current_state, mode='fit')
             reward = self.p.act(action)
-            if reward == self.rewards['positive']:
+            if reward >= self.rewards['positive']:
                 score += 1
         print("Score obtained:", score)
-
 
 
 ########################################################################################################################
 
 if __name__ == "__main__":
-    #print(os.getenv("SDL_VIDEODRIVER"))
     interface(False)
 
     game = Snake(width=WIDTH, height=HEIGHT)
@@ -465,9 +435,7 @@ if __name__ == "__main__":
         "close": 1.5
     }
 
-
-    #with interface(False):
-    p = PLE(game, fps=30, force_fps=False, display_screen=True, reward_values=rewards)
+    p = PLE(game, fps=30, force_fps=False, display_screen=True, reward_values=rewards)  # frame_skip=6
 
     agent = DQNAgent(p, game, rewards)
 
@@ -481,7 +449,6 @@ if __name__ == "__main__":
         "activation_layer3": "softmax"
     }
 
-    agent.train_net(train_frames=2000, batch_size=100, model_params=nn_params, no_frames_to_save=100, ep=6)
+    agent.train_net(batch_size=100, model_params=nn_params, no_frames_to_save=1000, ep=1, no_frames_between_trains=100)
 
-    #agent.play_game(file_saved_weights='day_1_saved_9_15_dnq.h5', model_params=nn_params)
-
+    # batch size 64 128 # epoci 1

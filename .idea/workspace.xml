@@ -3,6 +3,7 @@
   <component name="ChangeListManager">
     <list default="true" id="feff09b9-1ab6-4bf2-8096-c53821a07b6c" name="Default Changelist" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/playing_snake.py" beforeDir="false" afterPath="$PROJECT_DIR$/playing_snake.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/ple.py" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/snake.py" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/snake_project.py" beforeDir="false" afterPath="$PROJECT_DIR$/snake_project.py" afterDir="false" />
@@ -18,8 +19,8 @@
       <file pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/snake_project.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="420">
-              <caret line="427" column="33" selection-start-line="427" selection-start-column="33" selection-end-line="427" selection-end-column="33" />
+            <state relative-caret-position="-241">
+              <caret line="381" lean-forward="true" selection-start-line="381" selection-end-line="381" />
               <folding>
                 <element signature="e#0#18#0" expanded="true" />
               </folding>
@@ -28,12 +29,30 @@
         </entry>
       </file>
       <file pinned="false" current-in-tab="false">
+        <entry file="file://$USER_HOME$/PyGame-Learning-Environment/ple/ple.py">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="395">
+              <caret line="240" column="33" selection-start-line="240" selection-start-column="25" selection-end-line="240" selection-end-column="33" />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="false">
+        <entry file="file://$USER_HOME$/PyGame-Learning-Environment/ple/games/snake.py">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="620">
+              <caret line="384" column="22" selection-start-line="384" selection-start-column="17" selection-end-line="384" selection-end-column="22" />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/playing_snake.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="360">
-              <caret line="24" column="22" selection-start-line="24" selection-start-column="22" selection-end-line="24" selection-end-column="22" />
+            <state relative-caret-position="435">
+              <caret line="29" column="33" selection-start-line="29" selection-start-column="33" selection-end-line="29" selection-end-column="33" />
               <folding>
-                <element signature="e#0#15#0" expanded="true" />
+                <element signature="e#0#20#0" expanded="true" />
               </folding>
             </state>
           </provider>
@@ -54,13 +73,17 @@
       <find>instanta</find>
       <find>game</find>
       <find>rewards</find>
-      <find>#</find>
       <find>dreapta</find>
       <find>batch_s</find>
       <find>os.environ['SDL_VIDEODRIVER']</find>
       <find>os.environ[&quot;SDL_VIDEODRIVER&quot;]</find>
       <find>file_saved_weights</find>
       <find>video</find>
+      <find>print</find>
+      <find>environ</find>
+      <find>getScore</find>
+      <find>score</find>
+      <find>#</find>
     </findStrings>
     <replaceStrings>
       <replace>p</replace>
@@ -84,7 +107,7 @@
       </list>
     </option>
   </component>
-  <component name="ProjectFrameBounds" extendedState="5">
+  <component name="ProjectFrameBounds" extendedState="4">
     <option name="x" value="2646" />
     <option name="width" value="1281" />
     <option name="height" value="1413" />
@@ -192,7 +215,7 @@
     <frame x="2646" y="0" width="1281" height="1413" extended-state="4" />
     <editor active="true" />
     <layout>
-      <window_info content_ui="combo" id="Project" order="0" visible="true" weight="0.2205414" />
+      <window_info content_ui="combo" id="Project" order="0" visible="true" weight="0.16480891" />
       <window_info id="Structure" order="1" side_tool="true" weight="0.25" />
       <window_info id="Favorites" order="2" side_tool="true" />
       <window_info anchor="bottom" id="Message" order="0" />
@@ -232,30 +255,35 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/__init__.py">
+    <entry file="file://$PROJECT_DIR$/__init__.py" />
+    <entry file="file://$USER_HOME$/PyGame-Learning-Environment/ple/ple.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="15">
-          <caret line="1" column="27" selection-start-line="1" selection-start-column="27" selection-end-line="1" selection-end-column="27" />
-          <folding>
-            <element signature="e#0#27#0" expanded="true" />
-          </folding>
+        <state relative-caret-position="395">
+          <caret line="240" column="33" selection-start-line="240" selection-start-column="25" selection-end-line="240" selection-end-column="33" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$USER_HOME$/PyGame-Learning-Environment/ple/games/snake.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="620">
+          <caret line="384" column="22" selection-start-line="384" selection-start-column="17" selection-end-line="384" selection-end-column="22" />
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/playing_snake.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="360">
-          <caret line="24" column="22" selection-start-line="24" selection-start-column="22" selection-end-line="24" selection-end-column="22" />
+        <state relative-caret-position="435">
+          <caret line="29" column="33" selection-start-line="29" selection-start-column="33" selection-end-line="29" selection-end-column="33" />
           <folding>
-            <element signature="e#0#15#0" expanded="true" />
+            <element signature="e#0#20#0" expanded="true" />
           </folding>
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/snake_project.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="420">
-          <caret line="427" column="33" selection-start-line="427" selection-start-column="33" selection-end-line="427" selection-end-column="33" />
+        <state relative-caret-position="-241">
+          <caret line="381" lean-forward="true" selection-start-line="381" selection-end-line="381" />
           <folding>
             <element signature="e#0#18#0" expanded="true" />
           </folding>
